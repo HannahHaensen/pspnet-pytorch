@@ -30,17 +30,19 @@ class PSPModule(nn.Module):
 
 
 class PSPNet(nn.Module):
-    def __init__(self, n_classes=18, sizes=(1, 2, 3, 6), psp_size=2048, backend='resnet50', pretrained=False):
+    def __init__(self, n_classes=18, sizes=(1, 2, 3, 6), psp_size=2048, deep_features_size=1024, backend='resnet34',
+                 pretrained=True):
         super().__init__()
         self.feats = getattr(extractors, backend)(pretrained, n_classes)
 
+        print(psp_size, int(psp_size / len(sizes)))
         self.psp = PSPModule(psp_size, int(psp_size / len(sizes)), sizes)
 
         self.final = nn.Sequential(
             nn.Conv2d(psp_size*2, 512, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True),
-            nn.Conv2d(64, n_classes, kernel_size=1),
+            nn.Conv2d(512, n_classes, kernel_size=1),
         )
 
         self.aux = nn.Sequential(
@@ -62,6 +64,7 @@ class PSPNet(nn.Module):
         p = self.psp(f)
         print('After Psp')
         print(p.shape)
+        print(class_f.shape)
 
         p = self.final(p)
 
@@ -75,7 +78,7 @@ class PSPNet(nn.Module):
 
 if __name__ == '__main__':
     input = torch.rand(4, 3, 64, 128)
-    model = PSPNet(n_classes=19, pretrained=False, sizes=(1, 2, 3, 6), psp_size=2048, backend='resnet50')
+    model = PSPNet(n_classes=19, pretrained=False, sizes=(1, 2, 3, 6), psp_size=2048, deep_features_size=1024, backend='resnet50')
     model.eval()
     print(model)
     output = model(input)
