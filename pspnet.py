@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-import extractors
+import resnet_50
 
 
 class PSPModule(nn.Module):
@@ -33,7 +33,7 @@ class PSPNet(nn.Module):
     def __init__(self, n_classes=18, sizes=(1, 2, 3, 6), psp_size=2048, deep_features_size=1024, backend='resnet34',
                  pretrained=True):
         super().__init__()
-        self.feats = getattr(extractors, backend)(pretrained, n_classes)
+        self.feats = getattr(resnet_50, backend)(pretrained, n_classes)
 
         print(psp_size, int(psp_size / len(sizes)))
         self.psp = PSPModule(psp_size, int(psp_size / len(sizes)), sizes)
