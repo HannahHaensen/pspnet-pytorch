@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from model import extractor
+import extractors
 
 
 class PSPModule(nn.Module):
@@ -24,38 +24,46 @@ class PSPModule(nn.Module):
         bottle = self.bottleneck(torch.cat(priors, 1))
         return self.relu(bottle)
 
-
-class PSPUpsample(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, 3, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.PReLU()
-        )
+class PPM(nn.Module):
+    def __init__(self, in_dim, reduction_dim, bins):
+        super(PPM, self).__init__()
+        self.features = []
+        for bin in bins:
+            self.features.append(nn.Sequential(
+                nn.AdaptiveAvgPool2d(bin),
+                nn.Conv2d(in_dim, reduction_dim, kernel_size=1, bias=False),
+                nn.BatchNorm2d(reduction_dim),
+                nn.ReLU(inplace=True)
+            ))
+        self.features = nn.ModuleList(self.features)
 
     def forward(self, x):
-        h, w = 2 * x.size(2), 2 * x.size(3)
-        p = F.upsample(input=x, size=(h, w), mode='bilinear')
-        return self.conv(p)
-
+        x_size = x.size()
+        out = [x]
+        for f in self.features:
+            out.append(F.interpolate(f(x), x_size[2:], mode='bilinear', align_corners=True))
+        return torch.cat(out, 1)
 
 class PSPNet(nn.Module):
     def __init__(self, n_classes=18, sizes=(1, 2, 3, 6), psp_size=2048, deep_features_size=1024, backend='resnet34',
                  pretrained=True):
         super().__init__()
-        self.feats = getattr(extractor, backend)(pretrained, n_classes)
-        self.psp = PSPModule(psp_size, 1024, sizes)
-        self.drop_1 = nn.Dropout2d(p=0.3)
+        self.feats = getattr(extractors, backend)(pretrained, n_classes)
 
-        self.up_1 = PSPUpsample(1024, 256)
-        self.up_2 = PSPUpsample(256, 64)
-        self.up_3 = PSPUpsample(64, 64)
+        print(psp_size, int(psp_size / len(sizes)))
+        self.psp = PSPModule(psp_size, int(psp_size / len(sizes)), sizes)
+
+        self.ppm = PPM(psp_size, int(psp_size / len(sizes)), sizes)
+
+        self.drop_1 = nn.Dropout2d(p=0.3)
 
         self.drop_2 = nn.Dropout2d(p=0.15)
 
         self.final = nn.Sequential(
-            nn.Conv2d(64, n_classes, kernel_size=1),
+            nn.Conv2d(psp_size*2, 512, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, n_classes, kernel_size=1)
         )
 
         self.aux = nn.Sequential(
@@ -74,17 +82,10 @@ class PSPNet(nn.Module):
 
         f, class_f = self.feats(x)
 
-        p = self.psp(f)
-        p = self.drop_1(p)
-
-        p = self.up_1(p)
-        p = self.drop_2(p)
-
-        p = self.up_2(p)
-        p = self.drop_2(p)
-
-        p = self.up_3(p)
-        p = self.drop_2(p)
+        p = self.ppm(f)
+        print('After Psp')
+        print(p.shape)
+        print(class_f.shape)
 
         p = self.final(p)
 

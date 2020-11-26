@@ -1,8 +1,10 @@
-from collections import OrderedDict
-import math
-
 import torch
 import torch.nn as nn
+import math
+import torch.utils.model_zoo as model_zoo
+
+import torch.nn as nn
+
 import torch.nn.functional as F
 from torch.utils import model_zoo
 from torchvision.models.densenet import densenet121, densenet161
@@ -17,12 +19,12 @@ def conv3x3(in_planes, out_planes, stride=1, dilation=1):
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None, dilation=1):
+    def __init__(self, inplanes, planes, stride=1, downsample=None):
         super(BasicBlock, self).__init__()
-        self.conv1 = conv3x3(inplanes, planes, stride=stride, dilation=dilation)
+        self.conv1 = conv3x3(inplanes, planes, stride=stride)
         self.bn1 = nn.BatchNorm2d(planes)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(planes, planes, stride=1, dilation=dilation)
+        self.conv2 = conv3x3(planes, planes, stride=1)
         self.bn2 = nn.BatchNorm2d(planes)
         self.downsample = downsample
         self.stride = stride
@@ -85,7 +87,9 @@ class Bottleneck(nn.Module):
         return out
 
 
+
 class ResNet(nn.Module):
+
     def __init__(self, block, layers=(3, 4, 23, 3), n_classes=100):
         self.inplanes = 64
         super(ResNet, self).__init__()
@@ -95,11 +99,19 @@ class ResNet(nn.Module):
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)  # , dilation=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)  # , dilation=4)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dilation=2)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=4, dilation=4)
 
-        self.avgpool = nn.AvgPool2d(7, stride=1)
-        self.fc = nn.Linear(512 * block.expansion, n_classes)
+        for n, m in self.layer3.named_modules():
+            if 'conv2' in n:
+                m.dilation, m.padding, m.stride = (2, 2), (2, 2), (1, 1)
+            elif 'downsample.0' in n:
+                m.stride = (1, 1)
+        for n, m in self.layer4.named_modules():
+            if 'conv2' in n:
+                m.dilation, m.padding, m.stride = (4, 4), (4, 4), (1, 1)
+            elif 'downsample.0' in n:
+                m.stride = (1, 1)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -126,34 +138,20 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
+        x = self.relu(self.bn1(self.conv1(x)))
+
         x = self.maxpool(x)
 
         x = self.layer1(x)
         x = self.layer2(x)
         x_3 = self.layer3(x)
         x = self.layer4(x_3)
+        print('--------')
+        print(x.shape)
+        print(x_3.shape)
+        print('--------')
 
         return x, x_3
-
-
-def resnet18(pretrained=True, n_classes=100):
-    model = ResNet(BasicBlock, [2, 2, 2, 2], n_classes=n_classes)
-    if pretrained:
-        print(pretrained)
-        # load_weights_sequential(model, model_zoo.load_url(model_urls['resnet18']))
-    return model
-
-
-def resnet34(pretrained=True, n_classes=100):
-    model = ResNet(BasicBlock, [3, 4, 6, 3], n_classes=n_classes)
-    if pretrained:
-        print(pretrained)
-        # load_weights_sequential(model, model_zoo.load_url(model_urls['resnet18']))
-    return model
-
 
 def resnet50(pretrained=True, n_classes=100):
     model = ResNet(Bottleneck, [3, 4, 6, 3], n_classes=n_classes)
@@ -161,16 +159,3 @@ def resnet50(pretrained=True, n_classes=100):
         print(pretrained)
     return model
 
-
-def resnet101(pretrained=True, n_classes=100):
-    model = ResNet(Bottleneck, [3, 4, 23, 3], n_classes=n_classes)
-    if pretrained:
-        print(pretrained)
-    return model
-
-
-def resnet152(pretrained=True, n_classes=100):
-    model = ResNet(Bottleneck, [3, 8, 36, 3], n_classes=n_classes)
-    if pretrained:
-        print(pretrained)
-    return model
