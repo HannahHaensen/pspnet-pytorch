@@ -24,31 +24,10 @@ class PSPModule(nn.Module):
         priors = [F.interpolate(stage(feats), size=(h, w), mode='bilinear', align_corners=True) for stage in self.stages] + [feats]
         return torch.cat(priors, 1)
         # bottle = self.bottleneck(torch.cat(priors, 1))
-        # return torch.cat(priors, 1)
+
+        # return self.relu(bottle)
         # out = [feats]
-        # for f in self.stages:
-        #    out.append(F.interpolate(f(feats), size=(h, w), mode='bilinear', align_corners=True))
-        # return torch.cat(out, 1)
 
-class PPM(nn.Module):
-    def __init__(self, in_dim, reduction_dim, bins):
-        super(PPM, self).__init__()
-        self.features = []
-        for bin in bins:
-            self.features.append(nn.Sequential(
-                nn.AdaptiveAvgPool2d(bin),
-                nn.Conv2d(in_dim, reduction_dim, kernel_size=1, bias=False),
-                nn.BatchNorm2d(reduction_dim),
-                nn.ReLU(inplace=True)
-            ))
-        self.features = nn.ModuleList(self.features)
-
-    def forward(self, x):
-        x_size = x.size()
-        out = [x]
-        for f in self.features:
-            out.append(F.interpolate(f(x), x_size[2:], mode='bilinear', align_corners=True))
-        return torch.cat(out, 1)
 
 class PSPNet(nn.Module):
     def __init__(self, n_classes=18, sizes=(1, 2, 3, 6), psp_size=2048, backend='resnet50', pretrained=False):
@@ -57,13 +36,11 @@ class PSPNet(nn.Module):
 
         self.psp = PSPModule(psp_size, int(psp_size / len(sizes)), sizes)
 
-        self.ppm = PPM(psp_size, int(psp_size / len(sizes)), sizes)
-
         self.final = nn.Sequential(
             nn.Conv2d(psp_size*2, 512, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True),
-            nn.Conv2d(512, n_classes, kernel_size=1)
+            nn.Conv2d(64, n_classes, kernel_size=1),
         )
 
         self.aux = nn.Sequential(
