@@ -8,8 +8,6 @@ PyTorch implementation of PSPNet segmentation network
  
 ### Details
 
-This is a slightly different version - instead of direct 8x upsampling at the end I use three consequitive upsamplings for stability. 
-
 ### Feature extraction
 
 ### Usage 
