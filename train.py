@@ -14,10 +14,6 @@ from pspnet import PSPNet
 
 
 models = {
-    'squeezenet': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=512, deep_features_size=256, backend='squeezenet'),
-    'densenet': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=1024, deep_features_size=512, backend='densenet'),
-    'resnet18': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=512, deep_features_size=256, backend='resnet18'),
-    'resnet34': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=512, deep_features_size=256, backend='resnet34'),
     'resnet50': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=2048, deep_features_size=1024, backend='resnet50'),
     'resnet101': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=2048, deep_features_size=1024, backend='resnet101'),
     'resnet152': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=2048, deep_features_size=1024, backend='resnet152')
@@ -63,8 +59,7 @@ def train(data_path, models_path, backend, snapshot, crop_x, crop_y, batch_size,
         (Bx3xHxW FloatTensor x, BxHxW LongTensor y, BxN LongTensor y_cls) where
         x - batch of input images,
         y - batch of groung truth seg maps,
-        y_cls - batch of 1D tensors of dimensionality N: N total number of classes, 
-        y_cls[i, T] = 1 if class T is present in image i, 0 otherwise
+        y_cls - batch of aux predicitons
     '''
     train_loader, class_weights, n_images = None, None, None
     

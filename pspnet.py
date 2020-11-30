@@ -10,30 +10,29 @@ class PSPModule(nn.Module):
         super().__init__()
         self.stages = []
         self.stages = nn.ModuleList([self._make_stage(features, out_features, size) for size in sizes])
-        self.bottleneck = nn.Conv2d(features * (len(sizes) + 1), out_features, kernel_size=1)
-        self.relu = nn.ReLU()
 
     def _make_stage(self, features, out_features, size):
         prior = nn.AdaptiveAvgPool2d(size)
         conv = nn.Conv2d(features, out_features, kernel_size=1, bias=False)
-
         return nn.Sequential(prior, conv)
 
     def forward(self, feats):
         h, w = feats.size(2), feats.size(3)
+        # they are fused as the global prior
         priors = [F.interpolate(stage(feats), size=(h, w), mode='bilinear', align_corners=True) for stage in self.stages] + [feats]
+        # then we concat the prior to the final feature map in the final part of (c)# bottle = self.bottleneck(torch.cat(priors, 1))  
         return torch.cat(priors, 1)
-        # bottle = self.bottleneck(torch.cat(priors, 1))
 
-        # return self.relu(bottle)
-        # out = [feats]
+
 
 
 class PSPNet(nn.Module):
-    def __init__(self, n_classes=18, sizes=(1, 2, 3, 6), psp_size=2048, deep_features_size=1024, backend='resnet34',
+    # sizes are realted to the size of the feature map that is fed into the pyramid pooling layer
+    # (1, 2, 3, 6) = 4-level pyramid
+    def __init__(self, n_classes=18, sizes=(1, 2, 3, 6), psp_size=2048, backend='resnet50',
                  pretrained=True):
         super().__init__()
-        self.feats = getattr(resnet_50, backend)(pretrained, n_classes)
+        self.feats = getattr(resnet_50, backend)(pretrained)
 
         print(psp_size, int(psp_size / len(sizes)))
         self.psp = PSPModule(psp_size, int(psp_size / len(sizes)), sizes)
@@ -54,10 +53,7 @@ class PSPNet(nn.Module):
         )
 
     def forward(self, x):
-        x_size = x.size()
-        # assert (x_size[2]-1) % 8 == 0 and (x_size[3]-1) % 8 == 0
-        h = x_size[2]
-        w = x_size[3]
+        h, w = x.size(2), x.size(3)
 
         f, class_f = self.feats(x)
 
@@ -78,7 +74,7 @@ class PSPNet(nn.Module):
 
 if __name__ == '__main__':
     input = torch.rand(4, 3, 64, 128)
-    model = PSPNet(n_classes=19, pretrained=False, sizes=(1, 2, 3, 6), psp_size=2048, deep_features_size=1024, backend='resnet50')
+    model = PSPNet(n_classes=19, pretrained=False, sizes=(1, 2, 3, 6), psp_size=2048, backend='resnet50')
     model.eval()
     print(model)
     output = model(input)

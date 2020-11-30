@@ -8,20 +8,14 @@ PyTorch implementation of PSPNet segmentation network
  
 ### Details
 
-This is a slightly different version - instead of direct 8x upsampling at the end I use three consequitive upsamplings for stability. 
+- Note that a Dilated Resnet is used 
+    - dilated convolutions are used to increase the receptive field of the higher layers, compensating for the reduction in receptive field induced by removing subsampling.
+    - see @ [DRN](https://towardsdatascience.com/review-drn-dilated-residual-networks-image-classification-semantic-segmentation-d527e1a8fb5)
 
-### Feature extraction
+- Zoom Faktor in the end in original repo -> here interpolation back to original size
 
 ### Usage 
 
-To follow the training routine in train.py you need a DataLoader that yields the tuples of the following format:
 
-(Bx3xHxW FloatTensor x, BxHxW LongTensor y, BxN LongTensor y\_cls) where
-
-x - batch of input images,
-
-y - batch of groung truth seg maps,
-
-y\_cls - batch of image size
 
 

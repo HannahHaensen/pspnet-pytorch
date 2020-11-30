@@ -99,9 +99,12 @@ class ResNet(nn.Module):
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dilation=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=4, dilation=4)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
 
+
+        # for PSPNet a dilated Resnet is used
+        # greater field for gattering important data
         for n, m in self.layer3.named_modules():
             if 'conv2' in n:
                 m.dilation, m.padding, m.stride = (2, 2), (2, 2), (1, 1)
@@ -146,15 +149,11 @@ class ResNet(nn.Module):
         x = self.layer2(x)
         x_3 = self.layer3(x)
         x = self.layer4(x_3)
-        print('--------')
-        print(x.shape)
-        print(x_3.shape)
-        print('--------')
 
         return x, x_3
 
-def resnet50(pretrained=True, n_classes=100):
-    model = ResNet(Bottleneck, [3, 4, 6, 3], n_classes=n_classes)
+def resnet50(pretrained=True):
+    model = ResNet(Bottleneck, [3, 4, 6, 3])
     if pretrained:
         print(pretrained)
     return model
